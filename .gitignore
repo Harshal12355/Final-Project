@@ -1,0 +1,7 @@
+#ignore venv folder
+venv/
+example_extracted_frames/
+example_videos/
+frames/
+videos/
+

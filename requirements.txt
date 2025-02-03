@@ -1,0 +1,4 @@
+mediapipe
+albumentations
+opencv-python
+pandas
