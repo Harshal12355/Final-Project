@@ -24,6 +24,7 @@ label2idx = {label: idx for idx, label in enumerate(labels)}
 # Create reverse mapping for reporting.
 idx2label = {idx: label for label, idx in label2idx.items()}
 num_classes = len(label2idx)
+print(f"Number of classes: {num_classes}")
 print("Label mapping:", label2idx)
 
 # -------------------------
@@ -44,10 +45,33 @@ val_dataset = VideoDataset(root_dir=data_root, label2idx=label2idx,
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
 # -------------------------
-# Load the Trained Model
+# Load the Trained Model with special handling for mismatched FC layer
 # -------------------------
+# Create new model with 100 classes
 model = LRCN(num_classes=num_classes, hidden_size=256, num_layers=1, pretrained=True).to(device)
-model.load_state_dict(torch.load("lrcn_model.pth", map_location=device))
+
+# Option 1: Load the model weights partially (skipping the FC layer)
+try:
+    # First check if there's a model trained specifically for 100 classes
+    model.load_state_dict(torch.load("lrcn_model_100c.pth", map_location=device))
+    print("Loaded model trained on 100 classes")
+except:
+    print("No model found for 100 classes. Loading and adapting 2000-class model...")
+    # Load the pretrained model state dict
+    pretrained_dict = torch.load("lrcn_model.pth", map_location=device, weights_only=True)
+    
+    # Filter out the fc layer weights (which have mismatched sizes)
+    model_dict = model.state_dict()
+    pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and 'fc.' not in k}
+    
+    # Update the model with the pretrained layers (except fc)
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
+    print("Successfully loaded pretrained weights (excluding output layer)")
+    
+    # Option: Save the adapted model for future use
+    torch.save(model.state_dict(), "lrcn_model_100classes.pth")
+
 model.eval()  # Set the model to evaluation mode.
 
 criterion = nn.CrossEntropyLoss()
@@ -80,6 +104,7 @@ def evaluate(model, dataloader, criterion, device):
     accuracy = total_correct / total_samples
     return avg_loss, accuracy, all_preds, all_labels
 
+print("Starting evaluation...")
 avg_loss, accuracy, all_preds, all_labels = evaluate(model, val_loader, criterion, device)
 print(f"Validation Loss: {avg_loss:.4f}")
 print(f"Validation Accuracy: {accuracy:.4f}")
@@ -88,6 +113,7 @@ cm = confusion_matrix(all_labels, all_preds)
 print("Confusion Matrix:")
 print(cm)
 
+# Print classification report with class names
 report = classification_report(all_labels, all_preds, target_names=labels)
 print("Classification Report:")
 print(report)

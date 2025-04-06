@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 from extract_frames import extract_frames, extract_frames_from_videos, create_output_directories
 from video_dict import create_video_dict, verify_video_files
+from augment_data import analyze_class_distribution, balance_dataset, filter_to_top_categories
 
 def main():
     # Check if data directory exists, create if not
@@ -31,6 +32,27 @@ def main():
     create_output_directories(base_output_dir, valid_video_to_label)
 
     extract_frames_from_videos(videos_folder, base_output_dir, valid_video_to_label)
+    
+    # Analyze class distribution
+    print("Analyzing class distribution...")
+    distribution = analyze_class_distribution(base_output_dir)
+    
+    # Print some statistics
+    counts = list(distribution.values())
+    print(f"Total categories: {len(counts)}")
+    print(f"Samples per category - Min: {min(counts)}, Max: {max(counts)}, Mean: {np.mean(counts):.2f}, Median: {np.median(counts)}")
+    
+    # Automatically filter to top 100 categories
+    print("Filtering to top 100 categories...")
+    top_categories = filter_to_top_categories(base_output_dir, 100)
+    print(f"Dataset filtered to top 100 categories")
+    
+    # Option to balance the dataset
+    balance = input("Do you want to balance the dataset? (y/n): ").lower() == 'y'
+    if balance:
+        # You can specify a target count or use None for median
+        balance_dataset(base_output_dir)
+        print("Dataset balanced through augmentation")
 
 if __name__ == "__main__":
     main()
